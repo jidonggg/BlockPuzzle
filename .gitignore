@@ -58,3 +58,7 @@ Thumbs.db
 # Gradle
 /[Bb]aseProjectTemplate.gradle
 .gradle/
+
+# Claude Code
+.claude/
+nul
