@@ -34,12 +34,13 @@ namespace MergeDrop.Data
         public float containerWidth = 4.2f;
         public float containerHeight = 8.5f;
         public float containerBottomY = -3.8f;
-        public float gameOverLineY = 3.5f;
-        public float gameOverDelay = 1.2f;
+        public float gameOverLineY = 2.5f;
+        public float gameOverDelay = 1.0f;
 
         // ── 드롭 ──
         public float dropY = 4.8f;
         public float dropCooldown = 0.45f;
+        public float autoDropTime = 3.0f; // 3초 안에 안 놓으면 자동 드롭
         public float dropMinX = -1.9f;
         public float dropMaxX = 1.9f;
 
@@ -69,8 +70,8 @@ namespace MergeDrop.Data
 
         public static readonly float[] levelSizes =
         {
-            0.28f, 0.38f, 0.50f, 0.66f, 0.86f,
-            1.10f, 1.40f, 1.76f, 2.18f, 2.65f, 3.15f
+            0.38f, 0.50f, 0.65f, 0.84f, 1.06f,
+            1.32f, 1.62f, 1.96f, 2.35f, 2.80f, 3.30f
         };
 
         public static readonly int[] levelScores =

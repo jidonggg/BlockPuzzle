@@ -32,43 +32,43 @@ namespace MergeDrop.Core
             new DifficultyTier {  // Wave 1: 입문
                 scoreThreshold = 0,
                 minDropLevel = 0, maxDropLevel = 2,
-                gravityScale = 4.5f,
+                gravityScale = 5.0f,
                 dropWeights = new float[] { 40f, 35f, 25f }
             },
             new DifficultyTier {  // Wave 2: 본격 시작
-                scoreThreshold = 500,
+                scoreThreshold = 300,
                 minDropLevel = 0, maxDropLevel = 3,
-                gravityScale = 5.5f,
-                dropWeights = new float[] { 30f, 30f, 25f, 15f }
-            },
-            new DifficultyTier {  // Wave 3: 압박 시작
-                scoreThreshold = 1500,
-                minDropLevel = 0, maxDropLevel = 3,
-                gravityScale = 7.0f,
-                dropWeights = new float[] { 20f, 30f, 30f, 20f }
-            },
-            new DifficultyTier {  // Wave 4: 고난이도
-                scoreThreshold = 4000,
-                minDropLevel = 1, maxDropLevel = 4,
-                gravityScale = 9.0f,
+                gravityScale = 6.5f,
                 dropWeights = new float[] { 25f, 30f, 25f, 20f }
             },
-            new DifficultyTier {  // Wave 5: 극한
-                scoreThreshold = 8000,
-                minDropLevel = 1, maxDropLevel = 5,
-                gravityScale = 11.0f,
+            new DifficultyTier {  // Wave 3: 압박 시작
+                scoreThreshold = 1000,
+                minDropLevel = 0, maxDropLevel = 4,
+                gravityScale = 8.5f,
                 dropWeights = new float[] { 15f, 25f, 30f, 20f, 10f }
             },
+            new DifficultyTier {  // Wave 4: 고난이도
+                scoreThreshold = 2500,
+                minDropLevel = 1, maxDropLevel = 4,
+                gravityScale = 11.0f,
+                dropWeights = new float[] { 20f, 25f, 30f, 25f }
+            },
+            new DifficultyTier {  // Wave 5: 극한
+                scoreThreshold = 5000,
+                minDropLevel = 1, maxDropLevel = 5,
+                gravityScale = 14.0f,
+                dropWeights = new float[] { 10f, 20f, 30f, 25f, 15f }
+            },
             new DifficultyTier {  // Wave 6: 지옥
-                scoreThreshold = 15000,
+                scoreThreshold = 10000,
                 minDropLevel = 2, maxDropLevel = 5,
-                gravityScale = 13.0f,
-                dropWeights = new float[] { 20f, 30f, 30f, 20f }
+                gravityScale = 17.0f,
+                dropWeights = new float[] { 15f, 25f, 30f, 30f }
             }
         };
 
         // Obstacle intervals per tier (seconds; 0 = none)
-        private static readonly float[] obstacleIntervals = { 0f, 30f, 20f, 14f, 10f, 7f };
+        private static readonly float[] obstacleIntervals = { 0f, 20f, 14f, 10f, 7f, 5f };
 
         private int currentTierIndex;
         private float obstacleTimer;
