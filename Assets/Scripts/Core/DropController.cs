@@ -26,6 +26,12 @@ namespace MergeDrop.Core
         public float HoldTimeNormalized => currentObject != null
             ? Mathf.Clamp01(holdTimer / GameConfig.Instance.autoDropTime) : 0f;
 
+        // 드롭 금지 구역
+        private float lastDropX = float.NaN;
+        private SpriteRenderer exclusionZoneVisual;
+        private bool isInExclusionZone;
+        private float exclusionFlashTimer;
+
         // 가이드라인
         private LineRenderer guideLine;
         private SpriteRenderer timerRing;
@@ -43,6 +49,7 @@ namespace MergeDrop.Core
         private void Start()
         {
             CreateGuideLine();
+            CreateExclusionZoneVisual();
         }
 
         private void CreateGuideLine()
@@ -61,9 +68,77 @@ namespace MergeDrop.Core
             guideLine.enabled = false;
         }
 
+        private void CreateExclusionZoneVisual()
+        {
+            var go = new GameObject("ExclusionZone");
+            go.transform.SetParent(transform);
+            exclusionZoneVisual = go.AddComponent<SpriteRenderer>();
+            exclusionZoneVisual.sprite = CreateExclusionSprite();
+            exclusionZoneVisual.sortingOrder = 2;
+            exclusionZoneVisual.enabled = false;
+        }
+
+        private static Sprite exclusionSprite;
+        private static Sprite CreateExclusionSprite()
+        {
+            if (exclusionSprite != null) return exclusionSprite;
+            int w = 4, h = 64;
+            var tex = new Texture2D(w, h, TextureFormat.RGBA32, false);
+            tex.filterMode = FilterMode.Bilinear;
+            var pixels = new Color[w * h];
+            for (int y = 0; y < h; y++)
+                for (int x = 0; x < w; x++)
+                    pixels[y * w + x] = Color.white;
+            tex.SetPixels(pixels);
+            tex.Apply();
+            exclusionSprite = Sprite.Create(tex, new Rect(0, 0, w, h), new Vector2(0.5f, 0.5f), h);
+            return exclusionSprite;
+        }
+
+        private void UpdateExclusionZoneVisual()
+        {
+            if (exclusionZoneVisual == null) return;
+            var config = GameConfig.Instance;
+
+            if (float.IsNaN(lastDropX) || currentObject == null)
+            {
+                exclusionZoneVisual.enabled = false;
+                return;
+            }
+
+            exclusionZoneVisual.enabled = true;
+            float zoneWidth = config.dropExclusionRadius * 2f;
+            float zoneHeight = config.dropY - config.containerBottomY;
+            exclusionZoneVisual.transform.position = new Vector3(
+                lastDropX, (config.dropY + config.containerBottomY) / 2f, 0f);
+            exclusionZoneVisual.transform.localScale = new Vector3(zoneWidth, zoneHeight, 1f);
+
+            // 빨간색 반투명, 금지 구역 안이면 더 강하게 깜빡
+            float baseAlpha = 0.08f;
+            if (isInExclusionZone)
+            {
+                exclusionFlashTimer += Time.deltaTime * 6f;
+                float pulse = Mathf.PingPong(exclusionFlashTimer, 1f);
+                baseAlpha = Mathf.Lerp(0.12f, 0.25f, pulse);
+            }
+            else
+            {
+                exclusionFlashTimer = 0f;
+            }
+
+            exclusionZoneVisual.color = new Color(1f, 0.15f, 0.15f, baseAlpha);
+        }
+
+        private bool IsPositionInExclusionZone(float x)
+        {
+            if (float.IsNaN(lastDropX)) return false;
+            return Mathf.Abs(x - lastDropX) < GameConfig.Instance.dropExclusionRadius;
+        }
+
         public void Activate()
         {
             isActive = true;
+            lastDropX = float.NaN; // 첫 드롭은 제한 없음
             NextDropLevel = GetDropLevel();
             QueuedNextLevel = GetDropLevel();
             OnQueuedLevelChanged?.Invoke(QueuedNextLevel);
@@ -81,8 +156,11 @@ namespace MergeDrop.Core
         {
             isActive = false;
             isDragging = false;
+            lastDropX = float.NaN;
             if (guideLine != null)
                 guideLine.enabled = false;
+            if (exclusionZoneVisual != null)
+                exclusionZoneVisual.enabled = false;
             if (currentObject != null)
             {
                 ObjectSpawner.Instance.ReturnToPool(currentObject);
@@ -105,12 +183,22 @@ namespace MergeDrop.Core
             // 자동 드롭 타이머
             holdTimer += Time.deltaTime;
             UpdateTimerVisual();
+            UpdateExclusionZoneVisual();
+
+            // 현재 위치가 금지 구역인지 체크
+            if (currentObject != null)
+                isInExclusionZone = IsPositionInExclusionZone(currentObject.transform.position.x);
 
             if (holdTimer >= GameConfig.Instance.autoDropTime)
             {
-                // 시간 초과 — 현재 위치에서 강제 드롭
+                // 시간 초과 — 금지 구역이면 랜덤 유효 위치로 이동 후 드롭
                 isDragging = false;
                 if (guideLine != null) guideLine.enabled = false;
+                if (isInExclusionZone && currentObject != null)
+                {
+                    float safeX = FindSafeDropX();
+                    currentObject.SetDropPosition(safeX);
+                }
                 TryDrop();
                 return;
             }
@@ -138,7 +226,21 @@ namespace MergeDrop.Core
             if (isDragging && currentObject != null)
             {
                 currentObject.SetDropPosition(worldPos.x);
-                UpdateGuideLine(currentObject.transform.position.x, config);
+                float currentX = currentObject.transform.position.x;
+                UpdateGuideLine(currentX, config);
+
+                // 금지 구역이면 가이드라인 빨간색
+                bool inZone = IsPositionInExclusionZone(currentX);
+                if (inZone)
+                {
+                    guideLine.startColor = new Color(1f, 0.2f, 0.2f, 0.6f);
+                    guideLine.endColor = new Color(1f, 0.2f, 0.2f, 0.2f);
+                }
+                else
+                {
+                    guideLine.startColor = new Color(1f, 1f, 1f, 0.4f);
+                    guideLine.endColor = new Color(1f, 1f, 1f, 0.1f);
+                }
             }
 
             if (pointer.press.wasReleasedThisFrame && isDragging)
@@ -160,6 +262,19 @@ namespace MergeDrop.Core
 
             if (Time.time - lastDropTime < cooldown) return;
 
+            // 금지 구역 체크 (자동 드롭은 이미 FindSafeDropX로 보정됨)
+            float dropX = currentObject.transform.position.x;
+            if (IsPositionInExclusionZone(dropX))
+            {
+                // 드롭 거부 — 에러 피드백
+                if (AudioManager.Instance != null)
+                    AudioManager.Instance.PlayRejectSound();
+                // 금지 구역 시각 강조
+                exclusionFlashTimer = 0.5f;
+                return;
+            }
+
+            lastDropX = dropX;
             lastDropTime = Time.time;
             currentObject.Drop();
 
@@ -168,6 +283,37 @@ namespace MergeDrop.Core
 
             currentObject = null;
             Invoke(nameof(PrepareNext), cooldown);
+        }
+
+        private float FindSafeDropX()
+        {
+            var config = GameConfig.Instance;
+            float minX = config.dropMinX;
+            float maxX = config.dropMaxX;
+            float radius = config.dropExclusionRadius;
+
+            if (float.IsNaN(lastDropX)) return 0f;
+
+            // 금지 구역 밖에서 랜덤 위치 선택
+            // 왼쪽 영역: [minX, lastDropX - radius]
+            // 오른쪽 영역: [lastDropX + radius, maxX]
+            float leftMin = minX;
+            float leftMax = Mathf.Max(minX, lastDropX - radius);
+            float rightMin = Mathf.Min(maxX, lastDropX + radius);
+            float rightMax = maxX;
+
+            float leftRange = Mathf.Max(0, leftMax - leftMin);
+            float rightRange = Mathf.Max(0, rightMax - rightMin);
+            float totalRange = leftRange + rightRange;
+
+            if (totalRange <= 0.01f)
+                return lastDropX > 0 ? minX : maxX; // 극단적 경우
+
+            float rand = UnityEngine.Random.Range(0f, totalRange);
+            if (rand < leftRange)
+                return UnityEngine.Random.Range(leftMin, leftMax);
+            else
+                return UnityEngine.Random.Range(rightMin, rightMax);
         }
 
         private void PrepareNext()

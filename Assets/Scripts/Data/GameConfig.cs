@@ -43,6 +43,7 @@ namespace MergeDrop.Data
         public float autoDropTime = 3.0f; // 3초 안에 안 놓으면 자동 드롭
         public float dropMinX = -1.9f;
         public float dropMaxX = 1.9f;
+        public float dropExclusionRadius = 0.8f; // 마지막 드롭 위치 주변 금지 구역
 
         // ── 머지 ──
         public float mergeAnimDuration = 0.1f;

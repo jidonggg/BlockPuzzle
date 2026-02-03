@@ -97,6 +97,14 @@ namespace MergeDrop.Audio
         }
 
         // CC: 마일스톤 사운드
+        public void PlayRejectSound()
+        {
+            if (isMuted) return;
+            // 짧고 낮은 거부음
+            var clip = GenerateToneClip(150f, 0.1f, 0.3f);
+            sfxSource.PlayOneShot(clip, sfxVolume);
+        }
+
         public void PlayMilestoneSound()
         {
             if (isMuted) return;
