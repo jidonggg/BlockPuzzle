@@ -203,11 +203,20 @@ namespace MergeDrop.Core
                     MergeEffect.Instance.PlayMergeEffect(mergePos, GameConfig.GetColor(newLevel), GameConfig.GetSize(newLevel));
             }
 
-            // 큰 등급 머지 시 화면 흔들림
-            if (newLevel >= 5 && ScreenShake.Instance != null)
+            // 모든 머지에 화면 흔들림 (등급 높을수록 강하게)
+            if (ScreenShake.Instance != null)
             {
-                float intensity = GameConfig.Instance.screenShakeIntensity * (1f + (newLevel - 5) * 0.3f);
-                ScreenShake.Instance.Shake(intensity, GameConfig.Instance.screenShakeDuration);
+                float baseIntensity = 0.05f + newLevel * 0.03f;
+                float comboBonusIntensity = Mathf.Min(comboCount * 0.02f, 0.15f);
+                float intensity = baseIntensity + comboBonusIntensity;
+                float dur = 0.1f + newLevel * 0.02f;
+                ScreenShake.Instance.Shake(intensity, dur);
+            }
+
+            // 콤보 이펙트 (3콤보 이상)
+            if (comboCount >= 3 && MergeEffect.Instance != null)
+            {
+                MergeEffect.Instance.PlayComboEffect(mergePos, GameConfig.GetColor(newLevel), comboCount);
             }
 
             // 사운드

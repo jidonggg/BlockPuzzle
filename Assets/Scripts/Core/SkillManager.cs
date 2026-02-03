@@ -146,7 +146,7 @@ namespace MergeDrop.Core
 
         private void ExecuteDowngrade(MergeableObject target)
         {
-            if (target == null) return;
+            if (target == null || target.IsStone) return;
             target.DowngradeLevel(1);
         }
 

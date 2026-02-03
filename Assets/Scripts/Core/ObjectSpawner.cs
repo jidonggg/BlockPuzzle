@@ -110,6 +110,26 @@ namespace MergeDrop.Core
             }
         }
 
+        public MergeableObject SpawnStone(float x, float y, float size)
+        {
+            MergeableObject obj;
+            if (pool.Count > 0)
+            {
+                obj = pool.Dequeue();
+                obj.gameObject.SetActive(true);
+            }
+            else
+            {
+                obj = CreateNewObject();
+            }
+
+            obj.transform.position = new Vector3(x, y, 0f);
+            obj.gameObject.name = "Stone";
+            obj.InitializeAsStone(size);
+            activeObjects.Add(obj);
+            return obj;
+        }
+
         public List<MergeableObject> GetActiveObjects()
         {
             // 제거된 오브젝트 정리

@@ -1,4 +1,5 @@
 using UnityEngine;
+using System;
 using MergeDrop.Data;
 
 namespace MergeDrop.Core
@@ -8,6 +9,10 @@ namespace MergeDrop.Core
         public static DifficultyManager Instance { get; private set; }
 
         public float CurrentGravityScale { get; private set; }
+        public int CurrentTierIndex => currentTierIndex;
+        public int TotalTiers => tiers.Length;
+
+        public event Action<int> OnTierChanged; // tierIndex
 
         // Difficulty tiers
         private struct DifficultyTier
@@ -19,35 +24,54 @@ namespace MergeDrop.Core
             public float[] dropWeights;
         }
 
+        // Obstacle spawn interval (seconds) per tier; 0 = no obstacles
+        public float CurrentObstacleInterval { get; private set; }
+
         private static readonly DifficultyTier[] tiers = new DifficultyTier[]
         {
-            new DifficultyTier {
+            new DifficultyTier {  // Wave 1: 입문
                 scoreThreshold = 0,
+                minDropLevel = 0, maxDropLevel = 2,
+                gravityScale = 4.5f,
+                dropWeights = new float[] { 40f, 35f, 25f }
+            },
+            new DifficultyTier {  // Wave 2: 본격 시작
+                scoreThreshold = 500,
                 minDropLevel = 0, maxDropLevel = 3,
-                gravityScale = 5.0f,
-                dropWeights = new float[] { 35f, 30f, 20f, 15f }
-            },
-            new DifficultyTier {
-                scoreThreshold = 2000,
-                minDropLevel = 0, maxDropLevel = 4,
-                gravityScale = 5.3f,
-                dropWeights = new float[] { 25f, 30f, 25f, 15f, 5f }
-            },
-            new DifficultyTier {
-                scoreThreshold = 5000,
-                minDropLevel = 1, maxDropLevel = 4,
-                gravityScale = 5.7f,
+                gravityScale = 5.5f,
                 dropWeights = new float[] { 30f, 30f, 25f, 15f }
             },
-            new DifficultyTier {
-                scoreThreshold = 10000,
+            new DifficultyTier {  // Wave 3: 압박 시작
+                scoreThreshold = 1500,
+                minDropLevel = 0, maxDropLevel = 3,
+                gravityScale = 7.0f,
+                dropWeights = new float[] { 20f, 30f, 30f, 20f }
+            },
+            new DifficultyTier {  // Wave 4: 고난이도
+                scoreThreshold = 4000,
+                minDropLevel = 1, maxDropLevel = 4,
+                gravityScale = 9.0f,
+                dropWeights = new float[] { 25f, 30f, 25f, 20f }
+            },
+            new DifficultyTier {  // Wave 5: 극한
+                scoreThreshold = 8000,
                 minDropLevel = 1, maxDropLevel = 5,
-                gravityScale = 6.5f,
-                dropWeights = new float[] { 20f, 30f, 25f, 15f, 10f }
+                gravityScale = 11.0f,
+                dropWeights = new float[] { 15f, 25f, 30f, 20f, 10f }
+            },
+            new DifficultyTier {  // Wave 6: 지옥
+                scoreThreshold = 15000,
+                minDropLevel = 2, maxDropLevel = 5,
+                gravityScale = 13.0f,
+                dropWeights = new float[] { 20f, 30f, 30f, 20f }
             }
         };
 
+        // Obstacle intervals per tier (seconds; 0 = none)
+        private static readonly float[] obstacleIntervals = { 0f, 30f, 20f, 14f, 10f, 7f };
+
         private int currentTierIndex;
+        private float obstacleTimer;
 
         private void Awake()
         {
@@ -64,6 +88,29 @@ namespace MergeDrop.Core
         {
             if (ScoreManager.Instance != null)
                 ScoreManager.Instance.OnScoreChanged += OnScoreChanged;
+        }
+
+        private void Update()
+        {
+            if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
+            if (CurrentObstacleInterval <= 0f) return;
+
+            obstacleTimer += Time.deltaTime;
+            if (obstacleTimer >= CurrentObstacleInterval)
+            {
+                obstacleTimer = 0f;
+                SpawnObstacle();
+            }
+        }
+
+        private void SpawnObstacle()
+        {
+            if (ObjectSpawner.Instance == null) return;
+            var config = GameConfig.Instance;
+            float x = UnityEngine.Random.Range(config.dropMinX + 0.5f, config.dropMaxX - 0.5f);
+            float y = config.dropY + 0.5f;
+            float size = UnityEngine.Random.Range(0.5f, 0.9f);
+            ObjectSpawner.Instance.SpawnStone(x, y, size);
         }
 
         private void OnDestroy()
@@ -105,7 +152,18 @@ namespace MergeDrop.Core
                 CurrentGravityScale = tiers[newTierIndex].gravityScale;
             }
 
-            currentTierIndex = newTierIndex;
+            // Obstacle interval
+            CurrentObstacleInterval = obstacleIntervals[newTierIndex];
+
+            if (newTierIndex != currentTierIndex)
+            {
+                currentTierIndex = newTierIndex;
+                OnTierChanged?.Invoke(currentTierIndex);
+            }
+            else
+            {
+                currentTierIndex = newTierIndex;
+            }
 
             // Update all active objects' gravity
             if (ObjectSpawner.Instance != null)
@@ -128,7 +186,7 @@ namespace MergeDrop.Core
             for (int i = 0; i < weights.Length; i++)
                 total += weights[i];
 
-            float rand = Random.Range(0f, total);
+            float rand = UnityEngine.Random.Range(0f, total);
             float cumulative = 0f;
             for (int i = 0; i < weights.Length; i++)
             {
@@ -139,10 +197,25 @@ namespace MergeDrop.Core
             return tier.minDropLevel;
         }
 
+        public int GetTierScoreThreshold(int tierIndex)
+        {
+            if (tierIndex < 0 || tierIndex >= tiers.Length) return 0;
+            return tiers[tierIndex].scoreThreshold;
+        }
+
+        public int GetNextTierThreshold()
+        {
+            if (currentTierIndex < tiers.Length - 1)
+                return tiers[currentTierIndex + 1].scoreThreshold;
+            return -1; // no next tier
+        }
+
         public void ResetDifficulty()
         {
             currentTierIndex = 0;
             CurrentGravityScale = tiers[0].gravityScale;
+            CurrentObstacleInterval = obstacleIntervals[0];
+            obstacleTimer = 0f;
         }
     }
 }

@@ -31,17 +31,17 @@ namespace MergeDrop.Data
         public float angularDrag = 0.3f;
 
         // ── 컨테이너 (카메라에 꽉 차게) ──
-        public float containerWidth = 5.0f;
+        public float containerWidth = 4.2f;
         public float containerHeight = 8.5f;
         public float containerBottomY = -3.8f;
-        public float gameOverLineY = 4.0f;
-        public float gameOverDelay = 2.0f;
+        public float gameOverLineY = 3.5f;
+        public float gameOverDelay = 1.2f;
 
         // ── 드롭 ──
         public float dropY = 4.8f;
-        public float dropCooldown = 0.3f;
-        public float dropMinX = -2.3f;
-        public float dropMaxX = 2.3f;
+        public float dropCooldown = 0.45f;
+        public float dropMinX = -1.9f;
+        public float dropMaxX = 1.9f;
 
         // ── 머지 ──
         public float mergeAnimDuration = 0.1f;
@@ -69,8 +69,8 @@ namespace MergeDrop.Data
 
         public static readonly float[] levelSizes =
         {
-            0.45f, 0.58f, 0.72f, 0.88f, 1.05f,
-            1.25f, 1.45f, 1.68f, 1.92f, 2.20f, 2.50f
+            0.28f, 0.38f, 0.50f, 0.66f, 0.86f,
+            1.10f, 1.40f, 1.76f, 2.18f, 2.65f, 3.15f
         };
 
         public static readonly int[] levelScores =

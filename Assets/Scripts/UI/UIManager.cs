@@ -35,6 +35,12 @@ namespace MergeDrop.UI
         private Text gameOverBestText;
         private Text gameOverHighestLevelText;
 
+        // Wave/Target UI
+        private Text waveText;
+        private Text targetText;
+        private Image targetProgressBar;
+        private Image targetProgressFill;
+
         // F3: 피버 UI
         private Image[] feverBorders; // top, right, bottom, left
         private bool feverUIActive;
@@ -103,6 +109,7 @@ namespace MergeDrop.UI
             CreateGameOverPanel();
             CreatePauseButton();
             CreatePausePanel();
+            CreateWaveUI();
             CreateFeverBorders();
 
             if (ScoreManager.Instance != null)
@@ -119,6 +126,10 @@ namespace MergeDrop.UI
             }
             if (MergeSystem.Instance != null)
                 MergeSystem.Instance.OnMerge += OnMergeHappened;
+
+            // Wave/Tier events
+            if (DifficultyManager.Instance != null)
+                DifficultyManager.Instance.OnTierChanged += OnTierChanged;
 
             // F3: Fever events
             if (FeverManager.Instance != null)
@@ -175,6 +186,8 @@ namespace MergeDrop.UI
                 FeverManager.Instance.OnFeverStart -= OnFeverStart;
                 FeverManager.Instance.OnFeverEnd -= OnFeverEnd;
             }
+            if (DifficultyManager.Instance != null)
+                DifficultyManager.Instance.OnTierChanged -= OnTierChanged;
         }
 
         // ────────────────────────────────────────
@@ -510,12 +523,6 @@ namespace MergeDrop.UI
             }
         }
 
-        private void UpdateScore(int score)
-        {
-            scoreText.text = score.ToString("N0");
-            StartCoroutine(ScalePunch(scoreText.rectTransform, 1.25f));
-        }
-
         private void UpdateBestScore(int best)
         {
             bestScoreText.text = $"BEST  {best:N0}";
@@ -542,6 +549,149 @@ namespace MergeDrop.UI
 
             int score = GameConfig.Instance.CalculateMergeScore(newLevel, combo);
             ShowFloatingScore(worldPos, score, GameConfig.GetColor(newLevel));
+        }
+
+        // ────────────────────────────────────────
+        //  Wave / Target UI
+        // ────────────────────────────────────────
+        private void CreateWaveUI()
+        {
+            // Wave panel (top center, below HUD)
+            var wavePanel = CreateRoundedPanel("WavePanel", canvas.transform,
+                new Vector2(0.5f, 1f), new Vector2(0.5f, 1f),
+                new Vector2(0f, -210f), new Vector2(350f, 70f),
+                new Vector2(0.5f, 1f), new Color(0.1f, 0.1f, 0.2f, 0.85f));
+
+            // Wave label
+            waveText = CreateStyledText(wavePanel.transform, "WaveText", "WAVE 1",
+                new Vector2(0f, 0.5f), new Vector2(0.35f, 1f),
+                Vector2.zero, Vector2.zero,
+                22, TextAnchor.MiddleCenter, accentGold);
+            waveText.rectTransform.offsetMin = new Vector2(8f, 0f);
+            waveText.rectTransform.offsetMax = new Vector2(0f, 0f);
+
+            // Target text
+            targetText = CreateStyledText(wavePanel.transform, "TargetText", "목표: 500",
+                new Vector2(0.35f, 0.55f), new Vector2(1f, 1f),
+                Vector2.zero, Vector2.zero,
+                18, TextAnchor.MiddleLeft, textDim);
+            targetText.rectTransform.offsetMin = new Vector2(8f, 0f);
+            targetText.rectTransform.offsetMax = new Vector2(-8f, 0f);
+
+            // Progress bar background
+            var barBgObj = new GameObject("TargetBarBg");
+            barBgObj.transform.SetParent(wavePanel.transform, false);
+            var barBgRT = barBgObj.AddComponent<RectTransform>();
+            barBgRT.anchorMin = new Vector2(0.36f, 0.12f);
+            barBgRT.anchorMax = new Vector2(0.96f, 0.45f);
+            barBgRT.offsetMin = Vector2.zero;
+            barBgRT.offsetMax = Vector2.zero;
+            targetProgressBar = barBgObj.AddComponent<Image>();
+            targetProgressBar.color = new Color(0.2f, 0.2f, 0.3f, 1f);
+
+            // Progress bar fill
+            var barFillObj = new GameObject("TargetBarFill");
+            barFillObj.transform.SetParent(barBgObj.transform, false);
+            var barFillRT = barFillObj.AddComponent<RectTransform>();
+            barFillRT.anchorMin = Vector2.zero;
+            barFillRT.anchorMax = new Vector2(0f, 1f);
+            barFillRT.offsetMin = Vector2.zero;
+            barFillRT.offsetMax = Vector2.zero;
+            targetProgressFill = barFillObj.AddComponent<Image>();
+            targetProgressFill.color = accentGreen;
+
+            UpdateWaveUI();
+        }
+
+        private void OnTierChanged(int tierIndex)
+        {
+            UpdateWaveUI();
+            // Flash wave change
+            StartCoroutine(WaveChangeFlash(tierIndex));
+        }
+
+        private void UpdateWaveUI()
+        {
+            if (DifficultyManager.Instance == null) return;
+
+            int tier = DifficultyManager.Instance.CurrentTierIndex;
+            waveText.text = $"WAVE {tier + 1}";
+
+            int nextThreshold = DifficultyManager.Instance.GetNextTierThreshold();
+            int currentScore = ScoreManager.Instance != null ? ScoreManager.Instance.CurrentScore : 0;
+
+            if (nextThreshold > 0)
+            {
+                targetText.text = $"목표: {nextThreshold:N0}";
+                int tierStart = DifficultyManager.Instance.GetTierScoreThreshold(tier);
+                float progress = Mathf.InverseLerp(tierStart, nextThreshold, currentScore);
+                targetProgressFill.rectTransform.anchorMax = new Vector2(progress, 1f);
+                targetProgressFill.color = accentGreen;
+            }
+            else
+            {
+                targetText.text = "MAX WAVE!";
+                targetProgressFill.rectTransform.anchorMax = new Vector2(1f, 1f);
+                targetProgressFill.color = accentGold;
+            }
+        }
+
+        private IEnumerator WaveChangeFlash(int tier)
+        {
+            // Show big wave text
+            var flashObj = new GameObject("WaveFlash");
+            flashObj.transform.SetParent(canvas.transform, false);
+            var flashText = flashObj.AddComponent<Text>();
+            flashText.text = $"WAVE {tier + 1}";
+            flashText.fontSize = 72;
+            flashText.alignment = TextAnchor.MiddleCenter;
+            flashText.color = accentGold;
+            flashText.fontStyle = FontStyle.Bold;
+            if (koreanFont != null) flashText.font = koreanFont;
+            AddOutline(flashObj, new Color(0f, 0f, 0f, 0.8f), new Vector2(3f, -3f));
+
+            var rt = flashText.rectTransform;
+            rt.anchorMin = new Vector2(0.5f, 0.5f);
+            rt.anchorMax = new Vector2(0.5f, 0.5f);
+            rt.sizeDelta = new Vector2(600f, 120f);
+            rt.anchoredPosition = Vector2.zero;
+
+            // Scale in
+            float elapsed = 0f;
+            float duration = 0.4f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / duration;
+                float scale = Mathf.Lerp(2f, 1f, t * t);
+                rt.localScale = new Vector3(scale, scale, 1f);
+                flashText.color = new Color(accentGold.r, accentGold.g, accentGold.b, Mathf.Min(1f, t * 3f));
+                yield return null;
+            }
+
+            // Hold
+            yield return new WaitForSecondsRealtime(0.8f);
+
+            // Fade out
+            elapsed = 0f;
+            duration = 0.5f;
+            while (elapsed < duration)
+            {
+                elapsed += Time.unscaledDeltaTime;
+                float t = elapsed / duration;
+                flashText.color = new Color(accentGold.r, accentGold.g, accentGold.b, 1f - t);
+                rt.anchoredPosition = new Vector2(0f, t * 60f);
+                yield return null;
+            }
+
+            Destroy(flashObj);
+        }
+
+        private void UpdateScore(int score)
+        {
+            scoreText.text = score.ToString("N0");
+            StartCoroutine(ScalePunch(scoreText.rectTransform, 1.25f));
+            UpdateWaveUI();
         }
 
         // ────────────────────────────────────────

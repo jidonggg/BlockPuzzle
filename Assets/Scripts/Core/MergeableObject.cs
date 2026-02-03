@@ -10,6 +10,7 @@ namespace MergeDrop.Core
         public int Level { get; private set; }
         public bool CanMerge { get; private set; }
         public bool IsMerging { get; set; }
+        public bool IsStone { get; private set; }
 
         private Rigidbody2D rb;
         private CircleCollider2D circleCollider;
@@ -26,6 +27,9 @@ namespace MergeDrop.Core
 
         // F7: Golden
         private GoldenObject goldenObject;
+
+        // Level label
+        private TextMesh levelLabel;
 
         private static Sprite sharedCircleSprite;
         private static Sprite sharedHighlightSprite;
@@ -46,6 +50,7 @@ namespace MergeDrop.Core
             ApplyVisuals();
             ApplyPhysics();
             SetupEyes();
+            SetupLevelLabel();
 
             if (dropping)
             {
@@ -164,6 +169,7 @@ namespace MergeDrop.Core
             IsMerging = false;
             ApplyVisuals();
             SetupEyes();
+            SetupLevelLabel();
 
             circleCollider.radius = 0.5f;
             rb.bodyType = RigidbodyType2D.Dynamic;
@@ -182,6 +188,7 @@ namespace MergeDrop.Core
             CanMerge = false;
             IsMerging = false;
             isDropping = false;
+            IsStone = false;
             CancelInvoke();
 
             // F4: Reset squash
@@ -192,6 +199,9 @@ namespace MergeDrop.Core
             }
             baseScale = Vector3.one;
             transform.localScale = Vector3.one;
+
+            // Reset label
+            if (levelLabel != null) levelLabel.gameObject.SetActive(false);
 
             // F1: Reset eyes
             if (eyes != null) eyes.ResetEyes();
@@ -228,11 +238,11 @@ namespace MergeDrop.Core
             // F1: Eyes collision reaction
             if (eyes != null) eyes.SetState(ObjectEyes.EyeState.Collision);
 
-            if (!CanMerge || IsMerging) return;
+            if (!CanMerge || IsMerging || IsStone) return;
             if (GameManager.Instance == null || GameManager.Instance.State != GameState.Playing) return;
 
             var other = collision.gameObject.GetComponent<MergeableObject>();
-            if (other == null || !other.CanMerge || other.IsMerging) return;
+            if (other == null || !other.CanMerge || other.IsMerging || other.IsStone) return;
             if (other.Level != Level) return;
 
             if (Level >= GameConfig.MaxLevel)
@@ -307,6 +317,100 @@ namespace MergeDrop.Core
             eyes.Setup(Level);
         }
 
+        // ── Level Label ──
+        private void SetupLevelLabel()
+        {
+            if (levelLabel == null)
+            {
+                var labelObj = transform.Find("LevelLabel");
+                if (labelObj == null)
+                {
+                    var go = new GameObject("LevelLabel");
+                    go.transform.SetParent(transform, false);
+                    go.transform.localPosition = new Vector3(0f, 0f, -0.1f);
+                    levelLabel = go.AddComponent<TextMesh>();
+                    levelLabel.alignment = TextAlignment.Center;
+                    levelLabel.anchor = TextAnchor.MiddleCenter;
+                    levelLabel.fontStyle = FontStyle.Bold;
+                    levelLabel.color = Color.white;
+                    var mr = go.GetComponent<MeshRenderer>();
+                    mr.sortingOrder = 4;
+                }
+                else
+                {
+                    levelLabel = labelObj.GetComponent<TextMesh>();
+                }
+            }
+
+            // Scale relative to parent — fixed world size regardless of ball size
+            float parentSize = GameConfig.GetSize(Level);
+            float labelWorldSize = 0.4f; // fixed readable size
+            float relativeScale = labelWorldSize / Mathf.Max(parentSize, 0.1f);
+            levelLabel.transform.localScale = new Vector3(relativeScale, relativeScale, 1f);
+
+            levelLabel.text = Level <= 9 ? Level.ToString() : "★";
+            levelLabel.fontSize = 64;
+            levelLabel.characterSize = 0.15f;
+            levelLabel.color = new Color(1f, 1f, 1f, 0.9f);
+            levelLabel.gameObject.SetActive(true);
+        }
+
+        // ── Stone (Obstacle) ──
+        public void InitializeAsStone(float size)
+        {
+            Level = -1;
+            isDropping = false;
+            CanMerge = false;
+            IsMerging = false;
+            IsStone = true;
+
+            rb = GetComponent<Rigidbody2D>();
+            circleCollider = GetComponent<CircleCollider2D>();
+            spriteRenderer = GetComponent<SpriteRenderer>();
+            if (spriteRenderer == null)
+                spriteRenderer = gameObject.AddComponent<SpriteRenderer>();
+
+            if (sharedCircleSprite == null)
+                sharedCircleSprite = CreateCircleSprite(256);
+
+            spriteRenderer.sprite = sharedCircleSprite;
+            spriteRenderer.color = new Color(0.4f, 0.4f, 0.45f);
+            spriteRenderer.sortingOrder = 1;
+
+            baseScale = new Vector3(size, size, 1f);
+            transform.localScale = baseScale;
+
+            // Hide highlight for stones
+            SetupHighlight();
+            if (innerHighlight != null)
+                innerHighlight.color = new Color(0.6f, 0.6f, 0.6f, 0.15f);
+
+            circleCollider.radius = 0.5f;
+            var config = GameConfig.Instance;
+            var mat = new PhysicsMaterial2D("StoneMat")
+            {
+                friction = config.physicsFriction * 1.5f,
+                bounciness = config.physicsBounciness * 0.5f
+            };
+            circleCollider.sharedMaterial = mat;
+
+            rb.bodyType = RigidbodyType2D.Dynamic;
+            rb.gravityScale = DifficultyManager.Instance != null
+                ? DifficultyManager.Instance.CurrentGravityScale * 1.2f
+                : config.gravityScale * 1.2f;
+            rb.linearDamping = config.linearDrag * 2f;
+            rb.angularDamping = config.angularDrag;
+            rb.collisionDetectionMode = CollisionDetectionMode2D.Continuous;
+            rb.interpolation = RigidbodyInterpolation2D.Interpolate;
+            rb.mass = 3f; // heavier than normal
+
+            // No eyes or label on stones
+            if (eyes != null) eyes.gameObject.SetActive(false);
+            if (levelLabel != null) levelLabel.gameObject.SetActive(false);
+
+            CanMerge = false;
+        }
+
         // ── F5: Skill - Downgrade Level ──
         public void DowngradeLevel(int levels)
         {
@@ -315,6 +419,7 @@ namespace MergeDrop.Core
             Level = newLevel;
             ApplyVisuals();
             SetupEyes();
+            SetupLevelLabel();
             circleCollider.radius = 0.5f;
         }
 

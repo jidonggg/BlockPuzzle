@@ -62,3 +62,8 @@ Thumbs.db
 # Claude Code
 .claude/
 nul
+
+# Temp utility files
+autoplay.flag
+focus_unity.ps1
+unity_build.log

@@ -44,12 +44,12 @@ namespace MergeDrop.Core
             var lineObj = new GameObject("GuideLine");
             lineObj.transform.SetParent(transform);
             guideLine = lineObj.AddComponent<LineRenderer>();
-            guideLine.startWidth = 0.04f;
-            guideLine.endWidth = 0.04f;
+            guideLine.startWidth = 0.06f;
+            guideLine.endWidth = 0.06f;
 
             guideLine.material = new Material(Shader.Find("Sprites/Default"));
-            guideLine.startColor = new Color(1f, 1f, 1f, 0.25f);
-            guideLine.endColor = new Color(1f, 1f, 1f, 0.05f);
+            guideLine.startColor = new Color(1f, 1f, 1f, 0.4f);
+            guideLine.endColor = new Color(1f, 1f, 1f, 0.1f);
             guideLine.positionCount = 2;
             guideLine.sortingOrder = 5;
             guideLine.enabled = false;
